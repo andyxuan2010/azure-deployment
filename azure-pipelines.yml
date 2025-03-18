@@ -1,0 +1,109 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+#      - main
+      - dev
+      - sbx
+
+pool:
+  name: 'Default'
+  # demands:
+  #   - terraform
+  vmImage: ubuntu-latest
+
+
+
+variables:
+  - name: env
+    ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+      value: 'prod'
+    ${{ if eq(variables['Build.SourceBranchName'], 'dev') }}:
+      value: 'dev'
+    ${{ if eq(variables['Build.SourceBranchName'], 'sbx') }}:
+      value: 'sbx'
+  - name: subscription
+    ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+      value: 'prod'
+    ${{ if eq(variables['Build.SourceBranchName'], 'dev') }}:
+      value: 'nonprod'
+    ${{ if eq(variables['Build.SourceBranchName'], 'sbx') }}:
+      value: 'sbx'
+
+
+#   workload: '${{variables.workload}}'
+#   env: '${{variables.env}}'
+#   backendstoragekey: '${{variables.workload}}/${{variables.env}}/terraform.tfstate'
+# we have environment prod|nonprod|sbx
+
+steps:
+# - task: AzureKeyVault@2
+#   inputs:
+#     azureSubscription: 'sc-ccoe-iac-devops-prod'
+#     KeyVaultName: 'kv-ccoe-cc-prod-001'
+#     SecretsFilter: '*'
+#     RunAsPreJob: false
+#- task: AzureKeyVault@2
+#   inputs:
+#     azureSubscription: 'sc-ccoe-iac-devops-prod'
+#     KeyVaultName: 'kv-ccoe-cc-prod-001'
+#     SecretsFilter: '*'
+#     RunAsPreJob: false
+
+# - task: AzureKeyVault@2
+#   inputs:
+#     azureSubscription: 'BA-Prod(ef8ff35a-8548-485c-be32-204db0340dd1)'
+#     KeyVaultName: 'kv-ccoe-cc-prod-001'
+#     SecretsFilter: '*'
+#     RunAsPreJob: false
+- task: TerraformInstaller@1
+  inputs:
+    terraformVersion: 'latest'
+
+
+- task: Bash@3
+  displayName: "Get public ip of container (agent pool)"
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Write your commands here
+      curl -s http://ipinfo.io/json | jq '.ip'
+
+- task: TerraformTaskV4@4
+  displayName: "Terraform Init"
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+
+    #backendServiceArm: 'sc-ccoe-iac-devops-${{variables.env}}'
+    backendServiceArm: 'sc-ccoe-iac-devops-${{variables.subscription}}'
+    backendAzureRmResourceGroupName: 'rg-ccoe-iac-cc-${{variables.subscription}}'
+    backendAzureRmStorageAccountName: 'stccoeiaccc${{variables.subscription}}'
+    backendAzureRmContainerName: 'terraform'
+    backendAzureRmKey: '$(Build.Repository.Name)/terraform.tfstate'
+
+- task: TerraformTaskV4@4
+  displayName: "Terraform validate"
+  inputs:
+    provider: 'azurerm'
+    command: 'validate'
+
+- task: TerraformTaskV4@4
+  displayName: "Terraform Plan"
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    #environmentServiceNameAzureRM: 'sc-ccoe-iac-devops-${{variables.env}}'
+    environmentServiceNameAzureRM: 'sc-ccoe-iac-devops-${{variables.subscription}}'
+
+- task: TerraformTaskV4@4
+  displayName: "Terraform Apply"
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    environmentServiceNameAzureRM: 'sc-ccoe-iac-devops-${{variables.subscription}}'
+
