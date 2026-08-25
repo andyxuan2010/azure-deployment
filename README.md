@@ -162,4 +162,26 @@ More details will come
     pre-commit install
   ```
   and use .pre-commit-config.yaml file
-  
+
+## Pipeline and usage summary
+
+The repository has two infrastructure delivery paths. The GitHub Actions
+Terraform workflow initializes, formats, plans, and—when the event is a push to
+`main` with the required secrets—applies the configuration. The checked-in
+`azure-pipelines.yml` provides the corresponding Azure DevOps init, validate,
+plan, and apply stages. The Pages workflow only publishes repository
+documentation.
+
+For a local validation run, authenticate to the target subscription, then run
+from the repository root:
+
+```bash
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan
+```
+
+Review backend, subscription, and environment settings before `terraform apply`.
+Use the branch-to-environment mapping documented above and never commit ARM
+credentials or Terraform state.
